@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import Batteries.Control.OptionT
-
+import Batteries.Control.Lemmas
 
 /-!
 # Laws for Monads with Failure
@@ -110,7 +110,33 @@ class LawfulAlternativeLift (m : semiOutParam (Type u → Type v)) (n : Type u �
   monadLift_orElse (x y : m α) : monadLift (x <|> y) = (monadLift x <|> monadLift y : n α)
 
 export LawfulAlternativeLift (monadLift_failure monadLift_orElse)
-attribute [simp] monadLift_failure monadLift_orElse
+
+@[simp] theorem liftM_failure [Alternative m] [Alternative n] [MonadLift m n]
+    [LawfulAlternativeLift m n] : liftM (failure : m α) = (failure : n α) := monadLift_failure
+
+@[simp] theorem liftM_orElse [Alternative m] [Alternative n] [MonadLift m n]
+    [LawfulAlternativeLift m n] (x y : m α) : liftM (x <|> y) = (liftM x <|> liftM y : n α) :=
+  monadLift_orElse x y
+
+theorem monadLift_guard [AlternativeMonad m] [AlternativeMonad n] [MonadLift m n]
+    [LawfulAlternativeLift m n] [LawfulMonadLift m n] (p : Prop) [Decidable p] :
+    monadLift (guard p : m Unit) = (guard p : n Unit) := by
+  simp only [guard, apply_ite (f := monadLift), liftM_pure, liftM_failure]
+
+@[simp] theorem liftM_guard [AlternativeMonad m] [AlternativeMonad n] [MonadLift m n]
+    [LawfulAlternativeLift m n] [LawfulMonadLift m n] (p : Prop) [Decidable p] :
+    liftM (guard p : m Unit) = (guard p : n Unit) :=
+  monadLift_guard p
+
+theorem monadLift_optional [AlternativeMonad m] [AlternativeMonad n]
+    [LawfulMonad m] [LawfulMonad n] [MonadLift m n] [LawfulAlternativeLift m n] [LawfulMonadLift m n]
+    (x : m α) : monadLift (optional x) = optional (monadLift x : n α) := by
+  simp only [optional, liftM_orElse, liftM_map, liftM_pure]
+
+@[simp] theorem liftM_optional [AlternativeMonad m] [AlternativeMonad n]
+    [LawfulMonad m] [LawfulMonad n] [MonadLift m n] [LawfulAlternativeLift m n] [LawfulMonadLift m n]
+    (x : m α) : liftM (optional x) = optional (liftM x : n α) :=
+  monadLift_optional x
 
 namespace Option
 

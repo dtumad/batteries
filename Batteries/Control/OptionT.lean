@@ -4,7 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Sebastian Ullrich
 -/
 
-import Batteries.Control.Lemmas
+import Batteries.Control.Lawful.MonadLift
+
 
 /-!
 # Lemmas About Option Monad Transformer
@@ -25,6 +26,18 @@ namespace Option
 @[simp] theorem elimM_map [Monad m] [LawfulMonad m] (x : m α) (f : α → Option β)
     (y : m γ) (z : β → m γ) : Option.elimM (f <$> x) y z = (do Option.elim (f (← x)) y z) := by
   simp [Option.elimM]
+
+theorem monadLift_elimM [Monad m] [Monad n] [LawfulMonad m] [LawfulMonad n]
+    [MonadLift m n] [LawfulMonadLift m n] (x : m (Option α)) (y : m β) (z : α → m β) :
+      monadLift (Option.elimM x y z) =
+        Option.elimM (monadLift x : n (Option α)) (monadLift y) (fun x => monadLift (z x)) :=
+  (monadLift_bind _ _).trans (bind_congr fun | none => rfl | some _ => rfl)
+
+@[simp]
+theorem liftM_elimM [Monad m] [Monad n] [LawfulMonad m] [LawfulMonad n]
+    [MonadLift m n] [LawfulMonadLift m n] (x : m (Option α)) (y : m β) (z : α → m β) :
+      liftM (Option.elimM x y z) = Option.elimM (x : n (Option α)) (y) (fun x => z x) :=
+  monadLift_elimM x y z
 
 end Option
 

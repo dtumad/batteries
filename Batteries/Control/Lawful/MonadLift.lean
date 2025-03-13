@@ -109,6 +109,34 @@ instance (m) [Monad m] : LawfulMonadLiftT m m where
   monadLift_pure _ := rfl
   monadLift_bind _ _ := rfl
 
+section Bool
+
+theorem monadLift_orM [ToBool α] [Monad m] [Monad n] [MonadLift m n] [LawfulMonadLift m n]
+    (x y : m α) : monadLift (x <||> y : m α) = (monadLift x <||> monadLift y : n α) := by
+  simp [orM, liftM_bind]
+  exact bind_congr fun x => match toBool x with | true => monadLift_pure x | false => rfl
+
+@[simp] theorem liftM_orM [ToBool α] [Monad m] [Monad n] [MonadLift m n] [LawfulMonadLift m n]
+    (x y : m α) : liftM (x <||> y : m α) = (liftM x <||> liftM y : n α) := monadLift_orM x y
+
+theorem monadLift_andM [ToBool α] [Monad m] [Monad n] [MonadLift m n] [LawfulMonadLift m n]
+    (x y : m α) : monadLift (x <&&> y : m α) = (monadLift x <&&> monadLift y : n α) := by
+  simp [andM, liftM_bind]
+  exact bind_congr fun x => match toBool x with | true => rfl | false => monadLift_pure x
+
+@[simp] theorem liftM_andM [ToBool α] [Monad m] [Monad n] [MonadLift m n] [LawfulMonadLift m n]
+    (x y : m α) : liftM (x <&&> y : m α) = (liftM x <&&> liftM y : n α) := monadLift_andM x y
+
+theorem monadLift_notM [Monad m] [LawfulMonad m] [Monad n] [LawfulMonad n]
+    [MonadLift m n] [LawfulMonadLift m n] (x : m Bool) :
+    monadLift (notM x : m Bool) = notM (monadLift x : n Bool) := monadLift_map not x
+
+@[simp] theorem liftM_notM [Monad m] [LawfulMonad m] [Monad n] [LawfulMonad n]
+    [MonadLift m n] [LawfulMonadLift m n] (x : m Bool) :
+    liftM (notM x : m Bool) = notM (liftM x : n Bool) := monadLift_notM x
+
+end Bool
+
 namespace StateT
 
 variable [Monad m] [LawfulMonad m]
