@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import Batteries.Control.OptionT
+import Batteries.Lean.EStateM
+import Lean.Meta.Basic
 
 
 /-!
@@ -44,7 +46,7 @@ section LawfulAlternative
 
 /-- `LawfulAlternative m` means that the `failure` operation on `m` behaves naturally
 with respect to `map`, `seq`, and `orElse` operators. -/
-class LawfulAlternative (m : Type _ → Type _) [Alternative m] : Prop
+class LawfulAlternative (m : Type _ → Type _) [AlternativeMonad m] : Prop
     extends LawfulApplicative m where
   /-- Mapping the result of a failure is still a failure -/
   map_failure (f : α → β) : f <$> (failure : m α) = failure
@@ -65,19 +67,19 @@ attribute [simp] map_failure failure_seq orElse_failure failure_orElse map_orEls
 
 section Alternative
 
-@[simp] theorem mapConst_failure [Alternative m] [LawfulAlternative m] (y : β) :
+@[simp] theorem mapConst_failure [AlternativeMonad m] [LawfulAlternative m] (y : β) :
     Functor.mapConst y (failure : m α) = failure := by
   rw [LawfulFunctor.map_const, Function.comp_apply, map_failure]
 
-@[simp] theorem mapConst_orElse [Alternative m] [LawfulAlternative m] (x x' : m α) (y : β) :
+@[simp] theorem mapConst_orElse [AlternativeMonad m] [LawfulAlternative m] (x x' : m α) (y : β) :
     Functor.mapConst y (x <|> x') = (Functor.mapConst y x <|> Functor.mapConst y x') := by
   simp only [map_const, Function.comp_apply, map_orElse]
 
-@[simp] theorem failure_seqLeft [Alternative m] [LawfulAlternative m] (x : m α) :
+@[simp] theorem failure_seqLeft [AlternativeMonad m] [LawfulAlternative m] (x : m α) :
     (failure : m β) <* x = failure := by
   simp only [seqLeft_eq, map_failure, failure_seq]
 
-@[simp] theorem failure_seqRight [Alternative m] [LawfulAlternative m] (x : m α) :
+@[simp] theorem failure_seqRight [AlternativeMonad m] [LawfulAlternative m] (x : m α) :
     (failure : m β) *> x = failure := by
   simp only [seqRight_eq, map_failure, failure_seq]
 
@@ -194,3 +196,54 @@ instance [AlternativeMonad m] : LawfulAlternativeLift m (StateRefT' ω σ m) :=
   inferInstanceAs (LawfulAlternativeLift m (ReaderT _ _))
 
 end StateRefT'
+
+namespace Lean.Meta.MetaM
+
+instance EStateM.alternativeMonad [Inhabited ε] :
+    AlternativeMonad (EStateM ε σ) where
+  failure := fun s => .error default s
+  orElse x y := fun s => match x.run s with
+    | .ok x s => .ok x s
+    | .error e s' => match (y ()).run s' with
+      | .ok y s => .ok y s
+      | .error _ s'' => .error e s''
+
+instance {ε σ} [Inhabited ε] : LawfulAlternative (EStateM ε σ) where
+  map_failure _ := rfl
+  failure_seq _ := rfl
+  orElse_failure x := by
+    refine EStateM.ext fun s => ?_
+    unfold HOrElse.hOrElse
+    simp [instHOrElseOfOrElse]
+    simp [OrElse.orElse]
+    unfold Alternative.orElse
+    simp [EStateM.run, EStateM.alternativeMonad]
+    cases x s with
+    | ok y s' => rfl
+    | error e' s' => ?_
+    simp
+  failure_orElse x := by
+    refine EStateM.ext fun s => ?_
+    unfold HOrElse.hOrElse
+    simp [instHOrElseOfOrElse]
+    simp [OrElse.orElse]
+    unfold Alternative.orElse
+    simp [EStateM.run, EStateM.alternativeMonad]
+    cases x s with
+    | ok y s' => rfl
+    | error e' s' => ?_
+    simp
+    sorry
+  orElse_assoc _ _ _ := sorry --ReaderT.ext fun _ => orElse_assoc _ _ _
+  map_orElse _ _ _ := sorry
+
+@[reducible]
+instance : AlternativeMonad Lean.Meta.MetaM := by
+  unfold Lean.MetaM Lean.CoreM EIO
+  infer_instance
+
+instance : LawfulAlternative Lean.Meta.MetaM := by
+  unfold Lean.MetaM Lean.CoreM EIO
+  infer_instance
+
+end Lean.Meta.MetaM
