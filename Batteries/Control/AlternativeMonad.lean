@@ -206,7 +206,8 @@ instance EStateM.alternativeMonad [Inhabited ε] :
     | .ok x s => .ok x s
     | .error e s' => match (y ()).run s' with
       | .ok y s => .ok y s
-      | .error _ s'' => .error e s''
+      -- Depending if this is `e` or `e'` one below will fail
+      | .error e' s'' => .error e' s''
 
 instance {ε σ} [Inhabited ε] : LawfulAlternative (EStateM ε σ) where
   map_failure _ := rfl
@@ -222,6 +223,7 @@ instance {ε σ} [Inhabited ε] : LawfulAlternative (EStateM ε σ) where
     | ok y s' => rfl
     | error e' s' => ?_
     simp
+    sorry
   failure_orElse x := by
     refine EStateM.ext fun s => ?_
     unfold HOrElse.hOrElse
